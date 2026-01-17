@@ -1,4 +1,4 @@
-# Lagartija - Monitor de APIs RESTful
+# Xentinel - Monitor de APIs RESTful
 
 ## 📌 Descripción del Proyecto
 Aplicación para monitorear APIs RESTful locales en tiempo real, con dashboard visual, métricas de rendimiento y alertas.

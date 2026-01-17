@@ -1,4 +1,4 @@
-# Lagartija - API Monitor
+# Xentinel - API Monitor
 
 RESTful API monitoring dashboard built with Next.js, TypeScript, and Tailwind CSS.
 

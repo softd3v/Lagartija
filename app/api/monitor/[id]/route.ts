@@ -5,9 +5,9 @@ import { DEFAULT_APIS } from '@/config/apis.config';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const endpointId = params.id;
+  const { id: endpointId } = await params;
   const endpoint = DEFAULT_APIS.find(api => api.id === endpointId);
 
   if (!endpoint) {

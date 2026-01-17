@@ -38,6 +38,14 @@ export async function checkApiHealth(
     const expectedStatus = endpoint.expectedStatus ?? 200;
     const status: ApiStatus = response.ok && response.status === expectedStatus ? 'up' : 'down';
 
+    // Extract database connection status if available
+    let databaseConnected: boolean | undefined;
+    let databaseError: string | undefined;
+    if (responseData && typeof responseData === 'object' && 'database' in responseData) {
+      databaseConnected = responseData.database?.connected;
+      databaseError = responseData.database?.error;
+    }
+
     return {
       endpointId: endpoint.id,
       status,
@@ -45,6 +53,8 @@ export async function checkApiHealth(
       statusCode: response.status,
       timestamp,
       responseData,
+      databaseConnected,
+      databaseError,
     };
   } catch (error) {
     const endTime = performance.now();

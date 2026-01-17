@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lagartija - API Monitor",
+  title: "Xentinel - API Monitor",
   description: "RESTful API monitoring dashboard",
 };
 

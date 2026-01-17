@@ -4,7 +4,10 @@ import { sendAlertEmail } from './email-service';
 interface AlertState {
   endpointId: string;
   lastStatus: ApiStatus;
-  lastAlertTime: number;
+  lastDatabaseConnected?: boolean;
+  lastDownAlertTime: number;
+  lastRecoveredAlertTime: number;
+  lastDbAlertTime: number;
   consecutiveFailures: number;
 }
 
@@ -23,7 +26,10 @@ class AlertManager {
     const state = this.states.get(endpoint.id) || {
       endpointId: endpoint.id,
       lastStatus: 'unknown' as ApiStatus,
-      lastAlertTime: 0,
+      lastDatabaseConnected: undefined,
+      lastDownAlertTime: 0,
+      lastRecoveredAlertTime: 0,
+      lastDbAlertTime: 0,
       consecutiveFailures: 0,
     };
 
@@ -31,37 +37,73 @@ class AlertManager {
     const now = Date.now();
     const cooldownMs = this.cooldownMinutes * 60 * 1000;
 
-    // Check if status changed
-    const statusChanged = state.lastStatus !== 'unknown' && state.lastStatus !== currentStatus;
+    // Check API status changes
+    const statusChanged = state.lastStatus !== currentStatus;
 
-    // Check if cooldown period has passed
-    const cooldownPassed = now - state.lastAlertTime > cooldownMs;
-
-    if (statusChanged && cooldownPassed) {
-      // API went DOWN
+    if (statusChanged) {
+      // API went DOWN (including initial detection)
       if (currentStatus === 'down') {
-        console.log(`🚨 Alert: ${endpoint.name} went DOWN`);
-        try {
-          await sendAlertEmail(endpoint, healthCheck, 'down');
-          state.lastAlertTime = now;
-        } catch (error) {
-          console.error('Failed to send DOWN alert:', error);
+        const downCooldownPassed = now - state.lastDownAlertTime > cooldownMs;
+        if (downCooldownPassed) {
+          console.log(`🚨 Alert: ${endpoint.name} went DOWN`);
+          try {
+            await sendAlertEmail(endpoint, healthCheck, 'down');
+            state.lastDownAlertTime = now;
+          } catch (error) {
+            console.error('Failed to send DOWN alert:', error);
+          }
         }
       }
       
-      // API RECOVERED
+      // API RECOVERED (only if it was previously DOWN, not from unknown)
       if (currentStatus === 'up' && state.lastStatus === 'down') {
-        console.log(`✅ Alert: ${endpoint.name} recovered`);
-        try {
-          await sendAlertEmail(endpoint, healthCheck, 'recovered');
-          state.lastAlertTime = now;
-        } catch (error) {
-          console.error('Failed to send RECOVERY alert:', error);
+        const recoveredCooldownPassed = now - state.lastRecoveredAlertTime > cooldownMs;
+        if (recoveredCooldownPassed) {
+          console.log(`✅ Alert: ${endpoint.name} recovered`);
+          try {
+            await sendAlertEmail(endpoint, healthCheck, 'recovered');
+            state.lastRecoveredAlertTime = now;
+          } catch (error) {
+            console.error('Failed to send RECOVERY alert:', error);
+          }
         }
       }
     }
 
-    // Update state
+    // Check DATABASE status changes (separate from API status)
+    if (healthCheck.databaseConnected !== undefined) {
+      const dbStatusChanged = state.lastDatabaseConnected !== undefined && 
+                              state.lastDatabaseConnected !== healthCheck.databaseConnected;
+      const dbCooldownPassed = now - state.lastDbAlertTime > cooldownMs;
+
+      if (dbStatusChanged && dbCooldownPassed) {
+        // Database went DOWN
+        if (!healthCheck.databaseConnected) {
+          console.log(`🚨 Database Alert: ${endpoint.name} database disconnected`);
+          try {
+            await sendAlertEmail(endpoint, healthCheck, 'database-down');
+            state.lastDbAlertTime = now;
+          } catch (error) {
+            console.error('Failed to send DATABASE DOWN alert:', error);
+          }
+        }
+        
+        // Database RECOVERED
+        if (healthCheck.databaseConnected && !state.lastDatabaseConnected) {
+          console.log(`✅ Database Alert: ${endpoint.name} database reconnected`);
+          try {
+            await sendAlertEmail(endpoint, healthCheck, 'database-recovered');
+            state.lastDbAlertTime = now;
+          } catch (error) {
+            console.error('Failed to send DATABASE RECOVERY alert:', error);
+          }
+        }
+      }
+
+      state.lastDatabaseConnected = healthCheck.databaseConnected;
+    }
+
+    // Update API state
     state.lastStatus = currentStatus;
     if (currentStatus === 'down') {
       state.consecutiveFailures++;

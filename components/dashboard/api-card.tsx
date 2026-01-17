@@ -132,6 +132,31 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
         </div>
       )}
 
+      {/* Database Status */}
+      {lastCheck?.databaseConnected !== undefined && (
+        <div className={`mb-4 p-3 rounded border ${
+          lastCheck.databaseConnected 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">
+              {lastCheck.databaseConnected ? '✅' : '❌'} Database:
+            </span>
+            <span className={`text-sm font-medium ${
+              lastCheck.databaseConnected ? 'text-green-800' : 'text-red-800'
+            }`}>
+              {lastCheck.databaseConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+          {lastCheck.databaseError && (
+            <p className="text-xs text-red-800 mt-2">
+              <span className="font-semibold">Error:</span> {lastCheck.databaseError}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Error Message */}
       {lastCheck?.error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
