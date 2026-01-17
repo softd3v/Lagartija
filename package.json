@@ -1,26 +1,46 @@
 {
-  "name": "lagartija-app",
+  "name": "lagartija",
   "version": "0.1.0",
+  "description": "RESTful API monitoring dashboard",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
   },
+  "keywords": [
+    "api",
+    "monitor",
+    "dashboard",
+    "rest"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "next": "16.1.3",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "@tanstack/react-query": "^5.90.18",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.562.0",
+    "next": "^16.1.3",
+    "nodemailer": "^7.0.12",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.3",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@types/node": "^25.0.9",
+    "@types/nodemailer": "^7.0.5",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@types/recharts": "^1.8.29",
+    "autoprefixer": "^10.4.23",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3"
   }
 }
