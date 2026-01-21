@@ -41,21 +41,18 @@ class AlertManager {
     const statusChanged = state.lastStatus !== currentStatus;
 
     if (statusChanged) {
-      // API went DOWN (including initial detection)
+      // API went DOWN - NO COOLDOWN (always alert immediately)
       if (currentStatus === 'down') {
-        const downCooldownPassed = now - state.lastDownAlertTime > cooldownMs;
-        if (downCooldownPassed) {
-          console.log(`🚨 Alert: ${endpoint.name} went DOWN`);
-          try {
-            await sendAlertEmail(endpoint, healthCheck, 'down');
-            state.lastDownAlertTime = now;
-          } catch (error) {
-            console.error('Failed to send DOWN alert:', error);
-          }
+        console.log(`🚨 Alert: ${endpoint.name} went DOWN`);
+        try {
+          await sendAlertEmail(endpoint, healthCheck, 'down');
+          state.lastDownAlertTime = now;
+        } catch (error) {
+          console.error('Failed to send DOWN alert:', error);
         }
       }
       
-      // API RECOVERED (only if it was previously DOWN, not from unknown)
+      // API RECOVERED - WITH COOLDOWN (prevent spam if flapping)
       if (currentStatus === 'up' && state.lastStatus === 'down') {
         const recoveredCooldownPassed = now - state.lastRecoveredAlertTime > cooldownMs;
         if (recoveredCooldownPassed) {
@@ -66,6 +63,8 @@ class AlertManager {
           } catch (error) {
             console.error('Failed to send RECOVERY alert:', error);
           }
+        } else {
+          console.log(`⏳ RECOVERED alert skipped (cooldown active, ${Math.ceil((cooldownMs - (now - state.lastRecoveredAlertTime)) / 60000)} min remaining)`);
         }
       }
     }
