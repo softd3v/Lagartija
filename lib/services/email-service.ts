@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import type { ApiEndpoint, ApiHealthCheck } from '@/types';
+import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint, DatabaseEndpoint } from '@/types';
 
 interface EmailConfig {
   to: string[];
@@ -266,9 +266,123 @@ const generateDatabaseAlertEmail = (
   `;
 };
 
+// Generate database status alert email template
+const generateDatabaseStatusEmail = (
+  endpoint: DatabaseEndpoint,
+  healthCheck: ApiHealthCheck,
+  alertType: 'down' | 'recovered'
+): string => {
+  const isDown = alertType === 'down';
+  const statusColor = isDown ? '#ef4444' : '#10b981';
+  const statusText = isDown ? 'DATABASE DOWN ⚠️' : 'DATABASE RECOVERED ✅';
+  const statusBg = isDown ? '#fee2e2' : '#d1fae5';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 32px; border-bottom: 2px solid #e2e8f0;">
+              <h1 style="margin: 0; color: #000000; font-size: 28px; font-weight: 700;">
+                🛡️ Xentinel Monitor
+              </h1>
+              <p style="margin: 8px 0 0 0; color: #000000; font-size: 14px; font-weight: 700;">
+                Database Status Alert
+              </p>
+            </td>
+          </tr>
+
+          <!-- Status Badge -->
+          <tr>
+            <td style="padding: 32px;">
+              <div style="background-color: ${statusBg}; border-left: 4px solid ${statusColor}; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <h2 style="margin: 0 0 8px 0; color: ${statusColor}; font-size: 24px; font-weight: 700;">
+                  ${statusText}
+                </h2>
+                <p style="margin: 0; color: #64748b; font-size: 14px;">
+                  ${new Date(healthCheck.timestamp).toLocaleString('en-US', { 
+                    dateStyle: 'full', 
+                    timeStyle: 'long' 
+                  })}
+                </p>
+              </div>
+
+              <!-- Database Details -->
+              <table width="100%" cellpadding="12" cellspacing="0" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;">
+                <tr style="background-color: #f8fafc;">
+                  <td style="font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">Database Name</td>
+                  <td style="color: #1e293b; border-bottom: 1px solid #e2e8f0;">${endpoint.name}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: #475569; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">Host</td>
+                  <td style="color: #1e293b; font-family: monospace; font-size: 13px; border-bottom: 1px solid #e2e8f0;">${endpoint.host}:${endpoint.port}</td>
+                </tr>
+                <tr style="background-color: #f8fafc;">
+                  <td style="font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">Service Name</td>
+                  <td style="color: #1e293b; border-bottom: 1px solid #e2e8f0;">${endpoint.serviceName}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: #475569; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">Connection Time</td>
+                  <td style="color: #1e293b; border-bottom: 1px solid #e2e8f0;">${healthCheck.responseTime}ms</td>
+                </tr>
+                <tr style="background-color: #f8fafc;">
+                  <td style="font-weight: 600; color: #475569;">Status</td>
+                  <td style="color: #1e293b;">${healthCheck.status === 'up' ? '✅ Online' : '❌ Offline'}</td>
+                </tr>
+              </table>
+
+              ${healthCheck.error ? `
+                <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                  <h3 style="margin: 0 0 8px 0; color: #dc2626; font-size: 16px; font-weight: 600;">Error Details</h3>
+                  <p style="margin: 0; color: #991b1b; font-size: 14px; font-family: monospace;">${healthCheck.error}</p>
+                </div>
+              ` : ''}
+
+              ${endpoint.tags && endpoint.tags.length > 0 ? `
+                <div style="margin-top: 24px;">
+                  <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px; font-weight: 600;">Tags:</p>
+                  <div>
+                    ${endpoint.tags.map(tag => 
+                      `<span style="display: inline-block; background-color: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-right: 8px;">${tag}</span>`
+                    ).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px; border-radius: 0 0 12px 12px; text-align: center;">
+              <p style="margin: 0; color: #64748b; font-size: 13px;">
+                This is an automated alert from Xentinel Monitor
+              </p>
+              <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">
+                Dashboard: <a href="http://localhost:3000/dashboard" style="color: #3b82f6; text-decoration: none;">View Dashboard</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
 // Send alert email
 export async function sendAlertEmail(
-  endpoint: ApiEndpoint,
+  endpoint: MonitorEndpoint,
   healthCheck: ApiHealthCheck,
   alertType: 'down' | 'recovered' | 'database-down' | 'database-recovered'
 ): Promise<void> {
@@ -281,19 +395,24 @@ export async function sendAlertEmail(
 
   const transporter = createTransporter();
   
-  // Determine subject and HTML based on alert type
+  // Determine subject and HTML based on endpoint type and alert type
   let subject: string;
   let html: string;
   
-  if (alertType === 'database-down' || alertType === 'database-recovered') {
-    // Database alerts
+  if (endpoint.type === 'database') {
+    // Database endpoint alerts
+    const isDown = alertType === 'down';
+    subject = `🚨 DATABASE ${isDown ? 'DOWN' : 'RECOVERED'}: ${endpoint.name}`;
+    html = generateDatabaseStatusEmail(endpoint as DatabaseEndpoint, healthCheck, isDown ? 'down' : 'recovered');
+  } else if (alertType === 'database-down' || alertType === 'database-recovered') {
+    // API with database connection alerts
     const isDown = alertType === 'database-down';
     subject = `🚨 DATABASE ${isDown ? 'DISCONNECTED' : 'RECONNECTED'}: ${endpoint.name}`;
-    html = generateDatabaseAlertEmail(endpoint, healthCheck, isDown ? 'down' : 'recovered');
+    html = generateDatabaseAlertEmail(endpoint as ApiEndpoint, healthCheck, isDown ? 'down' : 'recovered');
   } else {
-    // API alerts
+    // Regular API alerts
     subject = `🚨 API ${alertType === 'down' ? 'DOWN' : 'RECOVERED'}: ${endpoint.name}`;
-    html = generateAlertEmail(endpoint, healthCheck, alertType);
+    html = generateAlertEmail(endpoint as ApiEndpoint, healthCheck, alertType);
   }
 
   try {

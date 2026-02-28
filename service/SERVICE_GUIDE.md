@@ -2,19 +2,20 @@
 
 ## Overview
 
-The Xentinel Windows Service allows you to run API monitoring **24/7 without a browser**, completely independent of the Next.js dashboard. The service runs in the background and automatically sends email alerts when APIs go down or recover.
+The Xentinel Windows Service allows you to run **API and Database monitoring 24/7 without a browser**, completely independent of the Next.js dashboard. The service runs in the background and automatically sends email alerts when APIs go down or recover, and when database connections fail or are restored.
 
 ---
 
 ## Features
 
 ✅ **24/7 Monitoring** - Runs continuously in the background  
+✅ **Multi-Type Support** - Monitors REST APIs and Oracle Databases  
 ✅ **No Browser Required** - Independent standalone service  
 ✅ **Auto-Start** - Starts automatically with Windows  
 ✅ **Auto-Restart** - Restarts automatically if it crashes  
 ✅ **Email Alerts** - Same alert system as the dashboard  
 ✅ **Logging** - All events logged to `service/logs/`  
-✅ **No Cooldown on DOWN** - Always alerts when API goes down  
+✅ **No Cooldown on DOWN** - Always alerts when API/DB goes down  
 ✅ **Cooldown on RECOVERED** - Prevents spam (5 min)  
 
 ---
@@ -151,14 +152,16 @@ Press `Ctrl + C` to stop.
 
 ## Configuration
 
-### API Endpoints
+### Monitored Endpoints
 
-Edit `service/monitor-service.js` and modify the `API_ENDPOINTS` array:
+Edit `service/monitor-service.js` and modify the `MONITOR_ENDPOINTS` array:
 
 ```javascript
-const API_ENDPOINTS = [
+const MONITOR_ENDPOINTS = [
+  // API Endpoint Example
   {
     id: "CCTAPIEA",
+    type: "api",
     name: "CCT API CAMCO EA",
     url: "http://172.20.10.112:5000/health/detailed",
     method: "GET",
@@ -166,7 +169,20 @@ const API_ENDPOINTS = [
     timeout: 5000,
     enabled: true,
   },
-  // Add more endpoints here
+  // Oracle Database Example
+  {
+    id: "ORACLE_CCTPROD",
+    type: "database",
+    name: "Oracle CCTPROD Database",
+    host: "172.20.10.10",
+    port: 1521,
+    serviceName: "CCTPROD",
+    username: envConfig.DB_ORACLE_CCTPROD_USER,
+    password: envConfig.DB_ORACLE_CCTPROD_PASSWORD,
+    interval: 60000, // 60 seconds
+    timeout: 10000,
+    enabled: true,
+  },
 ];
 ```
 
@@ -176,6 +192,18 @@ const API_ENDPOINTS = [
 sc stop "Xentinel API Monitor"
 sc start "Xentinel API Monitor"
 ```
+
+### Oracle Database Credentials
+
+Oracle credentials are stored in `.env.local`:
+
+```env
+# Oracle Database Credentials
+DB_ORACLE_CCTPROD_USER=SYSTEM
+DB_ORACLE_CCTPROD_PASSWORD=Manager1
+```
+
+**Format:** `DB_<ENDPOINT_ID>_USER` and `DB_<ENDPOINT_ID>_PASSWORD`
 
 ### Email Settings
 
