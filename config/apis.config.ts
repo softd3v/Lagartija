@@ -24,4 +24,15 @@ export const DEFAULT_APIS: ApiEndpoint[] = [
     expectedStatus: 200,
     tags: ["PA", "SOL", "EMCTOS"],
   },
+  {
+  id: "BRIDGECAMCO-TEST",
+  name: "Bridge Camco Test Environment",
+  url: "http://172.100.5.13",      // o https:// si usa SSL
+  method: "GET",
+  interval: 30,                     // chequea cada 30 segundos
+  timeout: 5000,
+  enabled: true,
+  expectedStatus: 200,              // o 301/302 si redirige
+  tags: ["Internal", "Website"],
+}
 ];
