@@ -41,7 +41,7 @@ export interface ApiHealthCheck {
   statusCode?: number;
   timestamp: string;
   error?: string;
-  responseData?: any; // JSON response from endpoint
+  responseData?: unknown; // JSON response from endpoint
   databaseConnected?: boolean; // Database connection status from response
   databaseError?: string; // Database error message if any
 }

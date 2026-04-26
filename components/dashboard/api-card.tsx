@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint, DatabaseEndpoint } from '@/types';
+import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint } from '@/types';
 import { checkApiHealth } from '@/lib/api-monitor/health-checker';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database } from 'lucide-react';
@@ -10,16 +10,19 @@ import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database } f
 interface ApiCardProps {
   endpoint: MonitorEndpoint;
   autoPolling?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
-export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
-  const [lastCheck, setLastCheck] = useState<{
-    status: 'up' | 'down';
-    responseTime: number;
-    timestamp: string;
-    error?: string;
-    responseData?: any;
-  } | null>(null);
+export function ApiCard({
+  endpoint,
+  autoPolling = false,
+  onEdit,
+  onDelete,
+  isDeleting = false,
+}: ApiCardProps) {
+  const [lastCheck, setLastCheck] = useState<ApiHealthCheck | null>(null);
   const [showResponse, setShowResponse] = useState(false);
 
   // Determine the correct API route based on endpoint type
@@ -52,10 +55,13 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
     },
     onSuccess: (data) => {
       setLastCheck({
+        endpointId: data.endpointId ?? endpoint.id,
         status: data.status as 'up' | 'down',
         responseTime: data.responseTime,
         timestamp: data.timestamp,
         error: data.error,
+        databaseConnected: data.databaseConnected,
+        databaseError: data.databaseError,
         responseData: data.responseData,
       });
     },
@@ -64,10 +70,13 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
   // Update display when auto-polling gets data
   if (autoData && (!lastCheck || autoData.timestamp !== lastCheck.timestamp)) {
     setLastCheck({
+      endpointId: autoData.endpointId ?? endpoint.id,
       status: autoData.status as 'up' | 'down',
       responseTime: autoData.responseTime,
       timestamp: autoData.timestamp,
       error: autoData.error,
+      databaseConnected: autoData.databaseConnected,
+      databaseError: autoData.databaseError,
       responseData: autoData.responseData,
     });
   }
@@ -84,7 +93,7 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-semibold text-slate-900">
@@ -113,7 +122,32 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
             )}
           </div>
         </div>
-        <StatusBadge status={currentStatus} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <StatusBadge status={currentStatus} />
+          {(onEdit || onDelete) && (
+            <div className="flex items-center gap-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isDeleting}
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Method/Type and Tags */}
@@ -190,7 +224,7 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
       )}
 
       {/* Response Data */}
-      {lastCheck?.responseData && (
+      {Boolean(lastCheck?.responseData) && (
         <div className="mb-4">
           <button
             onClick={() => setShowResponse(!showResponse)}
@@ -209,9 +243,9 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
           {showResponse && (
             <div className="mt-2 p-3 bg-slate-900 rounded overflow-auto max-h-96">
               <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
-                {typeof lastCheck.responseData === 'string'
-                  ? lastCheck.responseData
-                  : JSON.stringify(lastCheck.responseData, null, 2)}
+                {typeof lastCheck?.responseData === 'string'
+                  ? String(lastCheck?.responseData)
+                  : JSON.stringify(lastCheck?.responseData, null, 2)}
               </pre>
             </div>
           )}

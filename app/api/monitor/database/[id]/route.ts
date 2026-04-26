@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkDatabaseHealth } from '@/lib/api-monitor/database-health-checker';
 import { alertManager } from '@/lib/services/alert-manager';
-import { DEFAULT_ENDPOINTS } from '@/config/apis.config';
+import { getEndpointById } from '@/lib/db/endpoints-repository';
 import type { DatabaseEndpoint } from '@/types';
+
+export const runtime = 'nodejs';
 
 export async function GET(
   request: NextRequest,
@@ -11,8 +13,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Find the database endpoint in configuration
-    const endpoint = DEFAULT_ENDPOINTS.find((e) => e.id === id);
+    // Find the database endpoint in SQLite
+    const endpoint = getEndpointById(id);
 
     if (!endpoint) {
       return NextResponse.json(

@@ -1,12 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint, DatabaseEndpoint } from '@/types';
 
-interface EmailConfig {
-  to: string[];
-  subject: string;
-  html: string;
-}
-
 // Create reusable transporter
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -21,7 +15,7 @@ const createTransporter = () => {
 };
 
 // Format JSON for email display
-const formatJSON = (data: any): string => {
+const formatJSON = (data: unknown): string => {
   if (!data) return '<p class="text-gray-500">No response data</p>';
   
   const jsonString = typeof data === 'string' 

@@ -11,6 +11,7 @@ const nodemailer = require('nodemailer');
 const oracledb = require('oracledb');
 const fs = require('fs');
 const path = require('path');
+const { loadMonitorEndpoints } = require('./sqlite-endpoints');
 
 // Configure oracledb
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
@@ -71,8 +72,8 @@ if (CONFIG.ALERT_TO_EMAILS.length === 0) {
   console.error('[ERROR] ALERT_TO_EMAILS is empty! Check .env.local file.');
 }
 
-// Endpoints to monitor (APIs and Databases)
-const MONITOR_ENDPOINTS = [
+// Fallback endpoints when SQLite is unavailable
+const FALLBACK_MONITOR_ENDPOINTS = [
   {
     id: "CCTAPIEA",
     type: "api",
@@ -147,6 +148,8 @@ const MONITOR_ENDPOINTS = [
     enabled: true,
   },
 ];
+
+let MONITOR_ENDPOINTS = loadMonitorEndpoints(FALLBACK_MONITOR_ENDPOINTS, envConfig);
 
 // Alert State Management
 const alertStates = new Map();
@@ -276,7 +279,7 @@ function makeRequest(endpoint) {
               databaseConnected: jsonData.database?.connected,
               databaseError: jsonData.database?.error,
             });
-          } catch (error) {
+          } catch {
             resolve({
               status: 'down',
               statusCode: res.statusCode,
@@ -493,6 +496,8 @@ async function monitorEndpoint(endpoint) {
 // Start monitoring all endpoints
 function startMonitoring() {
   log('=== Xentinel Monitoring Service Started ===', 'INFO');
+
+  MONITOR_ENDPOINTS = loadMonitorEndpoints(FALLBACK_MONITOR_ENDPOINTS, envConfig);
   
   const enabledEndpoints = MONITOR_ENDPOINTS.filter(e => e.enabled);
   const apiCount = enabledEndpoints.filter(e => e.type === 'api').length;
