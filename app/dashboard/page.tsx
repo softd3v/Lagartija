@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiCard } from '@/components/dashboard/api-card';
 import { PollingControls } from '@/components/dashboard/polling-controls';
@@ -81,9 +82,14 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900">
-            Xentinel Monitor Dashboard
-          </h1>
+          <Image
+            src="/images/logo_xyntel.png"
+            alt="Xyntel Monitor"
+            width={150}
+            height={40}
+            priority
+            className="mb-2"
+          />
           <p className="text-slate-600 mt-2">
             Real-time monitoring of APIs and Databases
           </p>

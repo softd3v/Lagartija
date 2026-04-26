@@ -332,7 +332,7 @@ export function EndpointForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="rounded-md bg-[#cc0000] px-4 py-2 text-sm font-medium text-white hover:bg-[#aa0000] disabled:cursor-not-allowed disabled:bg-slate-400"
         >
           {isSubmitting ? 'Saving...' : submitLabel}
         </button>

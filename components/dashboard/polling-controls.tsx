@@ -29,7 +29,7 @@ export function PollingControls({ onTogglePolling, isPolling }: PollingControlsP
           className={`flex items-center gap-2 px-6 py-2 rounded-md transition-colors font-medium ${
             isPolling
               ? 'bg-orange-600 hover:bg-orange-700 text-white'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-[#cc0000] hover:bg-[#aa0000] text-white'
           }`}
         >
           {isPolling ? (

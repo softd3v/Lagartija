@@ -256,7 +256,7 @@ export function ApiCard({
       <button
         onClick={() => healthCheckMutation.mutate()}
         disabled={healthCheckMutation.isPending || !endpoint.enabled}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#cc0000] text-white rounded-md hover:bg-[#aa0000] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
       >
         <RefreshCw
           className={`w-4 h-4 ${healthCheckMutation.isPending ? 'animate-spin' : ''}`}
