@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkApiHealth } from '@/lib/api-monitor/health-checker';
 import { alertManager } from '@/lib/services/alert-manager';
-import { DEFAULT_APIS } from '@/config/apis.config';
+import { getEndpointById } from '@/lib/db/endpoints-repository';
+import type { ApiEndpoint } from '@/types';
+
+export const runtime = 'nodejs';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: endpointId } = await params;
-  const endpoint = DEFAULT_APIS.find(api => api.id === endpointId);
+  const endpoint = getEndpointById(endpointId);
 
-  if (!endpoint) {
+  if (!endpoint || endpoint.type !== 'api') {
     return NextResponse.json({ error: 'Endpoint not found' }, { status: 404 });
   }
 
   try {
-    const healthCheck = await checkApiHealth(endpoint);
+    const healthCheck = await checkApiHealth(endpoint as ApiEndpoint);
     
     // Check for alerts (status changes)
     await alertManager.checkAndAlert(endpoint, healthCheck);

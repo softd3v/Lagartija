@@ -1,0 +1,7 @@
+# Ignore service logs
+*.log
+
+# Ignore Windows service daemon files
+*.exe
+*.xml
+*.wrapper.log

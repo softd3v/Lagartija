@@ -1,4 +1,4 @@
-import type { ApiEndpoint, ApiHealthCheck, ApiStatus } from '@/types';
+import type { MonitorEndpoint, ApiHealthCheck, ApiStatus } from '@/types';
 import { sendAlertEmail } from './email-service';
 
 interface AlertState {
@@ -20,7 +20,7 @@ class AlertManager {
   }
 
   async checkAndAlert(
-    endpoint: ApiEndpoint,
+    endpoint: MonitorEndpoint,
     healthCheck: ApiHealthCheck
   ): Promise<void> {
     const state = this.states.get(endpoint.id) || {

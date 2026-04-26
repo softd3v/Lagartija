@@ -31,7 +31,7 @@ export async function checkApiHealth(
         const text = await response.text();
         responseData = text.substring(0, 500); // Limit text responses
       }
-    } catch (e) {
+    } catch {
       responseData = null;
     }
 

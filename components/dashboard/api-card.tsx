@@ -2,32 +2,40 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { ApiEndpoint, ApiHealthCheck } from '@/types';
+import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint } from '@/types';
 import { checkApiHealth } from '@/lib/api-monitor/health-checker';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database } from 'lucide-react';
 
 interface ApiCardProps {
-  endpoint: ApiEndpoint;
+  endpoint: MonitorEndpoint;
   autoPolling?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
-export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
-  const [lastCheck, setLastCheck] = useState<{
-    status: 'up' | 'down';
-    responseTime: number;
-    timestamp: string;
-    error?: string;
-    responseData?: any;
-  } | null>(null);
+export function ApiCard({
+  endpoint,
+  autoPolling = false,
+  onEdit,
+  onDelete,
+  isDeleting = false,
+}: ApiCardProps) {
+  const [lastCheck, setLastCheck] = useState<ApiHealthCheck | null>(null);
   const [showResponse, setShowResponse] = useState(false);
+
+  // Determine the correct API route based on endpoint type
+  const apiRoute = endpoint.type === 'database' 
+    ? `/api/monitor/database/${endpoint.id}`
+    : `/api/monitor/${endpoint.id}`;
 
   // Auto-polling query (server-side to trigger alerts)
   const { data: autoData } = useQuery<ApiHealthCheck>({
     queryKey: ['api-monitor', endpoint.id],
     queryFn: async () => {
-      const res = await fetch(`/api/monitor/${endpoint.id}`);
-      if (!res.ok) throw new Error('Failed to check API');
+      const res = await fetch(apiRoute);
+      if (!res.ok) throw new Error(`Failed to check ${endpoint.type}`);
       return res.json();
     },
     enabled: autoPolling && endpoint.enabled,
@@ -37,13 +45,23 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
 
   // Manual check mutation
   const healthCheckMutation = useMutation({
-    mutationFn: () => checkApiHealth(endpoint),
+    mutationFn: async () => {
+      if (endpoint.type === 'database') {
+        const res = await fetch(apiRoute);
+        if (!res.ok) throw new Error('Failed to check database');
+        return res.json();
+      }
+      return checkApiHealth(endpoint as ApiEndpoint);
+    },
     onSuccess: (data) => {
       setLastCheck({
+        endpointId: data.endpointId ?? endpoint.id,
         status: data.status as 'up' | 'down',
         responseTime: data.responseTime,
         timestamp: data.timestamp,
         error: data.error,
+        databaseConnected: data.databaseConnected,
+        databaseError: data.databaseError,
         responseData: data.responseData,
       });
     },
@@ -52,10 +70,13 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
   // Update display when auto-polling gets data
   if (autoData && (!lastCheck || autoData.timestamp !== lastCheck.timestamp)) {
     setLastCheck({
+      endpointId: autoData.endpointId ?? endpoint.id,
       status: autoData.status as 'up' | 'down',
       responseTime: autoData.responseTime,
       timestamp: autoData.timestamp,
       error: autoData.error,
+      databaseConnected: autoData.databaseConnected,
+      databaseError: autoData.databaseError,
       responseData: autoData.responseData,
     });
   }
@@ -72,7 +93,7 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-semibold text-slate-900">
@@ -86,17 +107,53 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
             )}
           </div>
           <div className="flex items-center text-sm text-slate-600 gap-2">
-            <Globe className="w-4 h-4" />
-            <span className="font-mono text-xs truncate">{endpoint.url}</span>
+            {endpoint.type === 'database' ? (
+              <>
+                <Database className="w-4 h-4" />
+                <span className="font-mono text-xs truncate">
+                  {endpoint.host}:{endpoint.port}/{endpoint.serviceName}
+                </span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-4 h-4" />
+                <span className="font-mono text-xs truncate">{endpoint.url}</span>
+              </>
+            )}
           </div>
         </div>
-        <StatusBadge status={currentStatus} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <StatusBadge status={currentStatus} />
+          {(onEdit || onDelete) && (
+            <div className="flex items-center gap-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isDeleting}
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Method and Tags */}
+      {/* Method/Type and Tags */}
       <div className="flex items-center gap-2 mb-4">
         <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
-          {endpoint.method}
+          {endpoint.type === 'database' ? 'DATABASE' : endpoint.method}
         </span>
         {endpoint.tags && endpoint.tags.length > 0 && (
           <div className="flex items-center gap-1">
@@ -167,7 +224,7 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
       )}
 
       {/* Response Data */}
-      {lastCheck?.responseData && (
+      {Boolean(lastCheck?.responseData) && (
         <div className="mb-4">
           <button
             onClick={() => setShowResponse(!showResponse)}
@@ -186,9 +243,9 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
           {showResponse && (
             <div className="mt-2 p-3 bg-slate-900 rounded overflow-auto max-h-96">
               <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
-                {typeof lastCheck.responseData === 'string'
-                  ? lastCheck.responseData
-                  : JSON.stringify(lastCheck.responseData, null, 2)}
+                {typeof lastCheck?.responseData === 'string'
+                  ? String(lastCheck?.responseData)
+                  : JSON.stringify(lastCheck?.responseData, null, 2)}
               </pre>
             </div>
           )}
@@ -199,7 +256,7 @@ export function ApiCard({ endpoint, autoPolling = false }: ApiCardProps) {
       <button
         onClick={() => healthCheckMutation.mutate()}
         disabled={healthCheckMutation.isPending || !endpoint.enabled}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#cc0000] text-white rounded-md hover:bg-[#aa0000] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
       >
         <RefreshCw
           className={`w-4 h-4 ${healthCheckMutation.isPending ? 'animate-spin' : ''}`}
