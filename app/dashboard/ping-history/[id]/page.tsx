@@ -129,8 +129,7 @@ export default function PingHistoryPage() {
   }, [resolvedId, rangeParams, refreshKey]);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="mx-auto max-w-7xl">
+    <>
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Network Ping History</h1>
@@ -282,7 +281,6 @@ export default function PingHistoryPage() {
             </section>
           </>
         )}
-      </div>
-    </div>
+    </>
   );
 }

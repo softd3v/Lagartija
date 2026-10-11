@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint } from '@/types';
-import { checkApiHealth } from '@/lib/api-monitor/health-checker';
+import type { MonitorEndpoint, ApiHealthCheck } from '@/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database, Network } from 'lucide-react';
 
@@ -46,15 +45,12 @@ export function ApiCard({
     retry: false,
   });
 
-  // Manual check mutation
+  // Manual check goes through the server so the browser never calls the target URL.
   const healthCheckMutation = useMutation({
     mutationFn: async () => {
-      if (endpoint.type === 'database' || endpoint.type === 'network') {
-        const res = await fetch(apiRoute);
-        if (!res.ok) throw new Error(`Failed to check ${endpoint.type}`);
-        return res.json();
-      }
-      return checkApiHealth(endpoint as ApiEndpoint);
+      const res = await fetch(apiRoute);
+      if (!res.ok) throw new Error(`Failed to check ${endpoint.type}`);
+      return res.json();
     },
     onSuccess: (data) => {
       setLastCheck({

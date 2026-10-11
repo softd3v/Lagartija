@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiCard } from '@/components/dashboard/api-card';
 import { PollingControls } from '@/components/dashboard/polling-controls';
-import { EndpointForm } from '@/components/dashboard/endpoint-form';
-import { WebhooksPanel } from '@/components/dashboard/webhooks-panel';
 import type { MonitorEndpoint } from '@/types';
 
 async function fetchEndpoints(): Promise<MonitorEndpoint[]> {
@@ -18,47 +17,12 @@ async function fetchEndpoints(): Promise<MonitorEndpoint[]> {
 
 export default function DashboardPage() {
   const [autoPolling, setAutoPolling] = useState(false);
-  const [editingEndpoint, setEditingEndpoint] = useState<MonitorEndpoint | null>(null);
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data: endpoints = [], isLoading, error } = useQuery({
     queryKey: ['endpoints'],
     queryFn: fetchEndpoints,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (endpoint: MonitorEndpoint) => {
-      const res = await fetch('/api/endpoints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(endpoint),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to create endpoint');
-      }
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['endpoints'] });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (endpoint: MonitorEndpoint) => {
-      const res = await fetch(`/api/endpoints/${editingEndpoint?.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(endpoint),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to update endpoint');
-      }
-    },
-    onSuccess: async () => {
-      setEditingEndpoint(null);
-      await queryClient.invalidateQueries({ queryKey: ['endpoints'] });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -81,94 +45,67 @@ export default function DashboardPage() {
   const networkCount = endpoints.filter((e) => e.type === 'network').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <Image
-            src="/images/logo_xyntel.png"
-            alt="Xyntel Monitor"
-            width={150}
-            height={40}
-            priority
-            className="mb-2"
-          />
-          <p className="text-slate-600 mt-2">
-            Real-time monitoring of APIs and Databases
+    <>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Monitored services</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            <span className="font-semibold">{endpoints.length}</span> endpoints
+            {apiCount > 0 && <span className="ml-2">({apiCount} APIs)</span>}
+            {dbCount > 0 && <span className="ml-2">({dbCount} Databases)</span>}
+            {networkCount > 0 && <span className="ml-2">({networkCount} Network)</span>}
           </p>
-          <div className="mt-4 flex items-center gap-4">
-            <div className="text-sm text-slate-600">
-              Monitoring <span className="font-semibold">{endpoints.length}</span> endpoints
-              {apiCount > 0 && <span className="ml-2">({apiCount} APIs)</span>}
-              {dbCount > 0 && <span className="ml-2">({dbCount} Databases)</span>}
-              {networkCount > 0 && <span className="ml-2">({networkCount} Network)</span>}
-            </div>
-          </div>
-        </header>
-
-        <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <EndpointForm
-            submitLabel="Create Endpoint"
-            onSubmit={async (endpoint) => createMutation.mutateAsync(endpoint)}
-          />
-
-          {editingEndpoint && (
-            <EndpointForm
-              initialValue={editingEndpoint}
-              submitLabel="Save Changes"
-              onCancel={() => setEditingEndpoint(null)}
-              onSubmit={async (endpoint) => updateMutation.mutateAsync(endpoint)}
-            />
-          )}
         </div>
-
-        <WebhooksPanel />
-
-        {/* Polling Controls */}
-        <PollingControls 
-          onTogglePolling={setAutoPolling}
-          isPolling={autoPolling}
-        />
-
-        {error && (
-          <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error instanceof Error ? error.message : 'Failed to load endpoints'}
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            Loading endpoints...
-          </div>
-        )}
-
-        {/* Endpoint Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {endpoints.map((endpoint) => {
-            return (
-              <ApiCard
-                key={endpoint.id}
-                endpoint={endpoint}
-                autoPolling={autoPolling}
-                onEdit={() => setEditingEndpoint(endpoint)}
-                onDelete={() => deleteMutation.mutate(endpoint.id)}
-                isDeleting={deleteMutation.isPending}
-              />
-            );
-          })}
-        </div>
-
-        {/* Empty State */}
-        {!isLoading && endpoints.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-slate-700 text-lg mb-2">
-              No endpoints configured
-            </p>
-            <p className="text-slate-500 text-sm">
-              Create your first endpoint using the form above
-            </p>
-          </div>
-        )}
+        <Link
+          href="/dashboard/endpoints/new"
+          className="rounded-md bg-[#cc0000] px-4 py-2 text-sm font-medium text-white hover:bg-[#aa0000]"
+        >
+          Add endpoint
+        </Link>
       </div>
-    </div>
+
+      <PollingControls
+        onTogglePolling={setAutoPolling}
+        isPolling={autoPolling}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error instanceof Error ? error.message : 'Failed to load endpoints'}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          Loading endpoints...
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {endpoints.map((endpoint) => (
+          <ApiCard
+            key={endpoint.id}
+            endpoint={endpoint}
+            autoPolling={autoPolling}
+            onEdit={() => router.push(`/dashboard/endpoints/${encodeURIComponent(endpoint.id)}`)}
+            onDelete={() => deleteMutation.mutate(endpoint.id)}
+            isDeleting={deleteMutation.isPending}
+          />
+        ))}
+      </div>
+
+      {!isLoading && endpoints.length === 0 && (
+        <div className="rounded-lg bg-white p-12 text-center shadow">
+          <p className="mb-2 text-lg text-slate-700">No endpoints configured</p>
+          <p className="mb-4 text-sm text-slate-500">Add an endpoint to start monitoring.</p>
+          <Link
+            href="/dashboard/endpoints/new"
+            className="inline-flex rounded-md bg-[#cc0000] px-4 py-2 text-sm font-medium text-white hover:bg-[#aa0000]"
+          >
+            Add endpoint
+          </Link>
+        </div>
+      )}
+    </>
   );
 }
