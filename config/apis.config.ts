@@ -86,6 +86,32 @@ export const DEFAULT_ENDPOINTS: MonitorEndpoint[] = [
     enabled: true,
     tags: ["Database", "Oracle", "Production"],
   },
+  {
+    id: "RTG14",
+    type: "network",
+    name: "RTG14",
+    host: "175.30.30.149",
+    interval: 30,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
+    tags: ["Network", "Tablet/PC", "PING"],
+  },
+  {
+    id: "RTG40",
+    type: "network",
+    name: "RTG40",
+    host: "175.30.30.189",
+    interval: 30,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
+    tags: ["Network", "Tablet/PC", "PING"],
+  },
 ];
 
 // Legacy export for backward compatibility

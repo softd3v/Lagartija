@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint, DatabaseEndpoint } from '@/types';
+import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint, DatabaseEndpoint, NetworkEndpoint } from '@/types';
 
 // Create reusable transporter
 const createTransporter = () => {
@@ -135,6 +135,51 @@ const generateAlertEmail = (
               <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">
                 Dashboard: <a href="http://localhost:3000/dashboard" style="color: #3b82f6; text-decoration: none;">View Dashboard</a>
               </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
+const generateNetworkAlertEmail = (
+  endpoint: NetworkEndpoint,
+  healthCheck: ApiHealthCheck,
+  alertType: 'down' | 'recovered'
+): string => {
+  const isDown = alertType === 'down';
+  const statusColor = isDown ? '#ef4444' : '#10b981';
+  const statusText = isDown ? 'PING DOWN ⚠️' : 'PING RECOVERED ✅';
+  const statusBg = isDown ? '#fee2e2' : '#d1fae5';
+
+  return `
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f8fafc;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 24px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px;">
+          <tr>
+            <td style="padding: 24px; border-bottom: 1px solid #e2e8f0;">
+              <h1 style="margin: 0; color: #111827;">Xentinel Monitor</h1>
+              <p style="margin: 8px 0 0 0; color: #64748b;">Network Endpoint Alert</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px;">
+              <div style="background-color: ${statusBg}; border-left: 4px solid ${statusColor}; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                <strong style="color: ${statusColor};">${statusText}</strong>
+              </div>
+              <p><strong>Endpoint:</strong> ${endpoint.name}</p>
+              <p><strong>Host:</strong> ${endpoint.host}</p>
+              <p><strong>Response Time:</strong> ${healthCheck.responseTime}ms</p>
+              <p><strong>Timestamp:</strong> ${new Date(healthCheck.timestamp).toLocaleString()}</p>
+              ${healthCheck.error ? `<p><strong>Error:</strong> ${healthCheck.error}</p>` : ''}
             </td>
           </tr>
         </table>
@@ -398,6 +443,9 @@ export async function sendAlertEmail(
     const isDown = alertType === 'down';
     subject = `🚨 DATABASE ${isDown ? 'DOWN' : 'RECOVERED'}: ${endpoint.name}`;
     html = generateDatabaseStatusEmail(endpoint as DatabaseEndpoint, healthCheck, isDown ? 'down' : 'recovered');
+  } else if (endpoint.type === 'network') {
+    subject = `🚨 PING ${alertType === 'down' ? 'DOWN' : 'RECOVERED'}: ${endpoint.name}`;
+    html = generateNetworkAlertEmail(endpoint as NetworkEndpoint, healthCheck, alertType === 'down' ? 'down' : 'recovered');
   } else if (alertType === 'database-down' || alertType === 'database-recovered') {
     // API with database connection alerts
     const isDown = alertType === 'database-down';

@@ -1,5 +1,11 @@
 # Xentinel Windows Service Guide
 
+> **⚠️ Documentación movida:** Ver [`docs/INSTALACION.md`](../docs/INSTALACION.md) y [`docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md).
+
+---
+
+# Xentinel Windows Service Guide (legacy)
+
 ## Overview
 
 The Xentinel Windows Service allows you to run **API and Database monitoring 24/7 without a browser**, completely independent of the Next.js dashboard. The service runs in the background and automatically sends email alerts when APIs go down or recover, and when database connections fail or are restored.

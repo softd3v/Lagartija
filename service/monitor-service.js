@@ -11,7 +11,15 @@ const nodemailer = require('nodemailer');
 const oracledb = require('oracledb');
 const fs = require('fs');
 const path = require('path');
-const { loadMonitorEndpoints } = require('./sqlite-endpoints');
+const { execFile } = require('child_process');
+const {
+  loadMonitorEndpoints,
+  loadWebhooks,
+  savePingSample,
+  openDowntimeIncident,
+  closeDowntimeIncident,
+} = require('./sqlite-endpoints');
+const { sendWebhookAlerts } = require('./webhook-alert');
 
 // Configure oracledb
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
@@ -146,6 +154,30 @@ const FALLBACK_MONITOR_ENDPOINTS = [
     interval: 60000, // 60 seconds
     timeout: 10000,
     enabled: true,
+  },
+  {
+    id: "RTG14",
+    type: "network",
+    name: "RTG14",
+    host: "175.30.30.149",
+    interval: 30000,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
+  },
+  {
+    id: "RTG40",
+    type: "network",
+    name: "RTG40",
+    host: "175.30.30.189",
+    interval: 30000,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
   },
 ];
 
@@ -312,6 +344,129 @@ function makeRequest(endpoint) {
   });
 }
 
+function parsePingOutput(stdout) {
+  const lessThanMatch = stdout.match(/time<\s*(\d+)ms/i);
+  if (lessThanMatch) {
+    return 1;
+  }
+
+  const equalsMatch = stdout.match(/time[=<]\s*(\d+)ms/i);
+  if (equalsMatch) {
+    return Number(equalsMatch[1]);
+  }
+
+  const avgMatch = stdout.match(/Average\s*=\s*(\d+)ms/i);
+  if (avgMatch) {
+    return Number(avgMatch[1]);
+  }
+
+  return null;
+}
+
+function checkNetworkPing(endpoint) {
+  const checkedAt = new Date().toISOString();
+  const packetCount = endpoint.pingPackets || 1;
+  const timeoutMs = endpoint.timeout || 2000;
+
+  return new Promise((resolve) => {
+    const args = ['-n', String(packetCount), '-w', String(timeoutMs), endpoint.host];
+    execFile('ping', args, { windowsHide: true }, (error, stdout = '', stderr = '') => {
+      const responseTime = parsePingOutput(stdout);
+
+      if (!error && responseTime !== null) {
+        resolve({
+          endpointId: endpoint.id,
+          status: 'up',
+          responseTime,
+          timestamp: checkedAt,
+        });
+        return;
+      }
+
+      const message = stderr.trim()
+        || stdout.split('\n').map((line) => line.trim()).filter(Boolean).slice(-1)[0]
+        || (error ? error.message : 'Ping failed');
+
+      resolve({
+        endpointId: endpoint.id,
+        status: 'down',
+        responseTime: responseTime !== null ? responseTime : timeoutMs,
+        timestamp: checkedAt,
+        error: message,
+      });
+    });
+  });
+}
+
+function getOrCreateAlertState(endpointId) {
+  const state = alertStates.get(endpointId) || {
+    lastStatus: 'unknown',
+    lastDatabaseConnected: undefined,
+    lastDownAlertTime: 0,
+    lastRecoveredAlertTime: 0,
+    lastDbAlertTime: 0,
+    consecutiveDown: 0,
+    consecutiveUp: 0,
+    activeIncidentId: null,
+  };
+  return state;
+}
+
+function persistPingSample(endpoint, healthCheck) {
+  savePingSample({
+    endpointId: endpoint.id,
+    endpointName: endpoint.name,
+    host: endpoint.host,
+    status: healthCheck.status,
+    responseTimeMs: typeof healthCheck.responseTime === 'number' ? healthCheck.responseTime : null,
+    error: healthCheck.error || null,
+    checkedAt: healthCheck.timestamp || new Date().toISOString(),
+  });
+}
+
+function updateNetworkIncidentState(endpoint, healthCheck) {
+  const state = getOrCreateAlertState(endpoint.id);
+  const downThreshold = Math.max(1, endpoint.downThreshold || 2);
+  const recoveryThreshold = Math.max(1, endpoint.recoveryThreshold || 2);
+
+  if (healthCheck.status === 'down') {
+    state.consecutiveDown += 1;
+    state.consecutiveUp = 0;
+
+    if (state.lastStatus !== 'down' && state.consecutiveDown >= downThreshold) {
+      state.lastStatus = 'down';
+      state.activeIncidentId = openDowntimeIncident({
+        endpointId: endpoint.id,
+        endpointName: endpoint.name,
+        host: endpoint.host,
+        startedAt: healthCheck.timestamp,
+        startedReason: healthCheck.error || 'Ping timeout',
+      });
+      log(`📉 Incident opened for ${endpoint.name} (id: ${state.activeIncidentId})`, 'ALERT');
+    }
+  } else {
+    state.consecutiveUp += 1;
+    state.consecutiveDown = 0;
+
+    if (state.lastStatus === 'down' && state.consecutiveUp >= recoveryThreshold) {
+      const closedId = closeDowntimeIncident(
+        endpoint.id,
+        healthCheck.timestamp,
+        'Recovered after successful ping(s)'
+      );
+      state.activeIncidentId = null;
+      state.lastStatus = 'up';
+      if (closedId) {
+        log(`📈 Incident closed for ${endpoint.name} (id: ${closedId})`, 'ALERT');
+      }
+    } else if (state.lastStatus === 'unknown') {
+      state.lastStatus = 'up';
+    }
+  }
+
+  alertStates.set(endpoint.id, state);
+}
+
 // Generate database alert email HTML
 function generateDatabaseAlertEmail(endpoint, healthCheck, alertType) {
   const statusColor = alertType === 'down' ? '#dc2626' : '#16a34a';
@@ -407,7 +562,7 @@ function generateAlertEmail(endpoint, healthCheck, alertType) {
 }
 
 // Send email alert
-async function sendAlert(endpoint, healthCheck, alertType) {
+async function sendEmailAlert(endpoint, healthCheck, alertType) {
   try {
     const isDatabase = endpoint.type === 'database';
     const label = isDatabase ? 'DATABASE' : 'API';
@@ -430,6 +585,14 @@ async function sendAlert(endpoint, healthCheck, alertType) {
   }
 }
 
+async function dispatchAlert(endpoint, healthCheck, alertType) {
+  const webhooks = loadWebhooks();
+  await Promise.allSettled([
+    sendEmailAlert(endpoint, healthCheck, alertType),
+    sendWebhookAlerts(endpoint, healthCheck, alertType, webhooks, log),
+  ]);
+}
+
 // Check and alert logic
 async function checkAndAlert(endpoint, healthCheck) {
   const state = alertStates.get(endpoint.id) || {
@@ -438,6 +601,9 @@ async function checkAndAlert(endpoint, healthCheck) {
     lastDownAlertTime: 0,
     lastRecoveredAlertTime: 0,
     lastDbAlertTime: 0,
+    consecutiveDown: 0,
+    consecutiveUp: 0,
+    activeIncidentId: null,
   };
   
   const currentStatus = healthCheck.status;
@@ -451,16 +617,17 @@ async function checkAndAlert(endpoint, healthCheck) {
     // API went DOWN - NO COOLDOWN (always alert immediately)
     if (currentStatus === 'down') {
       log(`🚨 Alert: ${endpoint.name} went DOWN`, 'ALERT');
-      await sendAlert(endpoint, healthCheck, 'down');
+      await dispatchAlert(endpoint, healthCheck, 'down');
       state.lastDownAlertTime = now;
     }
     
-    // API RECOVERED - WITH COOLDOWN
+    // API RECOVERED - cooldown unless a DOWN alert is still pending acknowledgement
     if (currentStatus === 'up' && state.lastStatus === 'down') {
+      const pendingRecovery = state.lastDownAlertTime > state.lastRecoveredAlertTime;
       const recoveredCooldownPassed = now - state.lastRecoveredAlertTime > cooldownMs;
-      if (recoveredCooldownPassed) {
+      if (pendingRecovery || recoveredCooldownPassed) {
         log(`✅ Alert: ${endpoint.name} recovered`, 'ALERT');
-        await sendAlert(endpoint, healthCheck, 'recovered');
+        await dispatchAlert(endpoint, healthCheck, 'recovered');
         state.lastRecoveredAlertTime = now;
       } else {
         const remainingMin = Math.ceil((cooldownMs - (now - state.lastRecoveredAlertTime)) / 60000);
@@ -480,9 +647,29 @@ async function monitorEndpoint(endpoint) {
     log(`Checking ${endpoint.name}...`, 'DEBUG');
     
     // Choose the appropriate health check based on endpoint type
-    const healthCheck = endpoint.type === 'database'
-      ? await checkOracleHealth(endpoint)
-      : await makeRequest(endpoint);
+    let healthCheck;
+    if (endpoint.type === 'database') {
+      healthCheck = await checkOracleHealth(endpoint);
+    } else if (endpoint.type === 'network') {
+      healthCheck = await checkNetworkPing(endpoint);
+      persistPingSample(endpoint, healthCheck);
+      updateNetworkIncidentState(endpoint, healthCheck);
+
+      const networkState = alertStates.get(endpoint.id);
+      if (networkState?.lastStatus === 'up' || networkState?.lastStatus === 'down') {
+        healthCheck = {
+          ...healthCheck,
+          status: networkState.lastStatus,
+        };
+      } else {
+        healthCheck = {
+          ...healthCheck,
+          status: 'unknown',
+        };
+      }
+    } else {
+      healthCheck = await makeRequest(endpoint);
+    }
     
     log(`${endpoint.name}: ${healthCheck.status.toUpperCase()} (${healthCheck.responseTime}ms)`, 'INFO');
     
@@ -502,10 +689,12 @@ function startMonitoring() {
   const enabledEndpoints = MONITOR_ENDPOINTS.filter(e => e.enabled);
   const apiCount = enabledEndpoints.filter(e => e.type === 'api').length;
   const dbCount = enabledEndpoints.filter(e => e.type === 'database').length;
+  const networkCount = enabledEndpoints.filter(e => e.type === 'network').length;
   
-  log(`Monitoring ${enabledEndpoints.length} endpoints (${apiCount} APIs, ${dbCount} Databases)`, 'INFO');
+  log(`Monitoring ${enabledEndpoints.length} endpoints (${apiCount} APIs, ${dbCount} Databases, ${networkCount} Network)`, 'INFO');
   log(`Alert cooldown: ${CONFIG.ALERT_COOLDOWN_MINUTES} minutes`, 'INFO');
   log(`Recipients: ${CONFIG.ALERT_TO_EMAILS.join(', ')}`, 'INFO');
+  log(`Webhooks: ${loadWebhooks().length} enabled`, 'INFO');
   log(`SMTP: ${CONFIG.SMTP_USER} @ ${CONFIG.SMTP_HOST}:${CONFIG.SMTP_PORT}`, 'INFO');
   
   MONITOR_ENDPOINTS.forEach(endpoint => {

@@ -1,5 +1,11 @@
 # Manual de Instalación - Xentinel Windows Service
 
+> **⚠️ Documentación movida:** Ver [`docs/INSTALACION.md`](../docs/INSTALACION.md) para la versión actualizada.
+
+---
+
+# Manual de Instalación - Xentinel Windows Service (legacy)
+
 ## 📋 Tabla de Contenidos
 1. [Requisitos Previos](#requisitos-previos)
 2. [Archivos Necesarios](#archivos-necesarios)

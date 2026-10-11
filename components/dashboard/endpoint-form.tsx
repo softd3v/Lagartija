@@ -5,7 +5,7 @@ import type { MonitorEndpoint } from '@/types';
 
 type EndpointFormValues = {
   id: string;
-  type: 'api' | 'database';
+  type: 'api' | 'database' | 'network';
   name: string;
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -13,6 +13,9 @@ type EndpointFormValues = {
   host: string;
   port: number;
   serviceName: string;
+  pingPackets: number;
+  downThreshold: number;
+  recoveryThreshold: number;
   interval: number;
   timeout: number;
   enabled: boolean;
@@ -36,6 +39,9 @@ const EMPTY_FORM: EndpointFormValues = {
   host: '',
   port: 1521,
   serviceName: '',
+  pingPackets: 1,
+  downThreshold: 2,
+  recoveryThreshold: 2,
   interval: 30,
   timeout: 5000,
   enabled: true,
@@ -69,6 +75,31 @@ export function EndpointForm({
         host: initialValue.host,
         port: initialValue.port,
         serviceName: initialValue.serviceName,
+        pingPackets: 1,
+        downThreshold: 2,
+        recoveryThreshold: 2,
+        interval: initialValue.interval,
+        timeout: initialValue.timeout,
+        enabled: initialValue.enabled,
+        tags: (initialValue.tags ?? []).join(', '),
+      });
+      return;
+    }
+
+    if (initialValue.type === 'network') {
+      setValues({
+        id: initialValue.id,
+        type: 'network',
+        name: initialValue.name,
+        url: '',
+        method: 'GET',
+        expectedStatus: 200,
+        host: initialValue.host,
+        port: 1521,
+        serviceName: '',
+        pingPackets: initialValue.pingPackets ?? 1,
+        downThreshold: initialValue.downThreshold ?? 2,
+        recoveryThreshold: initialValue.recoveryThreshold ?? 2,
         interval: initialValue.interval,
         timeout: initialValue.timeout,
         enabled: initialValue.enabled,
@@ -87,6 +118,9 @@ export function EndpointForm({
       host: '',
       port: 1521,
       serviceName: '',
+      pingPackets: 1,
+      downThreshold: 2,
+      recoveryThreshold: 2,
       interval: initialValue.interval,
       timeout: initialValue.timeout,
       enabled: initialValue.enabled,
@@ -103,32 +137,49 @@ export function EndpointForm({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const endpoint: MonitorEndpoint =
-      values.type === 'database'
-        ? {
-            id: values.id.trim(),
-            type: 'database',
-            name: values.name.trim(),
-            host: values.host.trim(),
-            port: Number(values.port),
-            serviceName: values.serviceName.trim(),
-            interval: Number(values.interval),
-            timeout: Number(values.timeout),
-            enabled: values.enabled,
-            tags,
-          }
-        : {
-            id: values.id.trim(),
-            type: 'api',
-            name: values.name.trim(),
-            url: values.url.trim(),
-            method: values.method,
-            interval: Number(values.interval),
-            timeout: Number(values.timeout),
-            enabled: values.enabled,
-            expectedStatus: Number(values.expectedStatus),
-            tags,
-          };
+    let endpoint: MonitorEndpoint;
+
+    if (values.type === 'database') {
+      endpoint = {
+        id: values.id.trim(),
+        type: 'database',
+        name: values.name.trim(),
+        host: values.host.trim(),
+        port: Number(values.port),
+        serviceName: values.serviceName.trim(),
+        interval: Number(values.interval),
+        timeout: Number(values.timeout),
+        enabled: values.enabled,
+        tags,
+      };
+    } else if (values.type === 'network') {
+      endpoint = {
+        id: values.id.trim(),
+        type: 'network',
+        name: values.name.trim(),
+        host: values.host.trim(),
+        interval: Number(values.interval),
+        timeout: Number(values.timeout),
+        enabled: values.enabled,
+        pingPackets: Number(values.pingPackets),
+        downThreshold: Number(values.downThreshold),
+        recoveryThreshold: Number(values.recoveryThreshold),
+        tags,
+      };
+    } else {
+      endpoint = {
+        id: values.id.trim(),
+        type: 'api',
+        name: values.name.trim(),
+        url: values.url.trim(),
+        method: values.method,
+        interval: Number(values.interval),
+        timeout: Number(values.timeout),
+        enabled: values.enabled,
+        expectedStatus: Number(values.expectedStatus),
+        tags,
+      };
+    }
 
     try {
       setIsSubmitting(true);
@@ -196,6 +247,7 @@ export function EndpointForm({
           >
             <option value="api">API / Website</option>
             <option value="database">Database</option>
+            <option value="network">Network PING</option>
           </select>
         </label>
 
@@ -251,7 +303,7 @@ export function EndpointForm({
               />
             </label>
           </>
-        ) : (
+        ) : values.type === 'database' ? (
           <>
             <label className="text-sm text-slate-700">
               Host
@@ -284,6 +336,55 @@ export function EndpointForm({
                 required
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 placeholder="CCTPROD"
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="text-sm text-slate-700 md:col-span-2">
+              Host / IP
+              <input
+                value={values.host}
+                onChange={(e) => updateValue('host', e.target.value)}
+                required
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                placeholder="175.30.30.149"
+              />
+            </label>
+
+            <label className="text-sm text-slate-700">
+              Ping Packets
+              <input
+                type="number"
+                value={values.pingPackets}
+                onChange={(e) => updateValue('pingPackets', Number(e.target.value))}
+                min={1}
+                max={10}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="text-sm text-slate-700">
+              Down Threshold
+              <input
+                type="number"
+                value={values.downThreshold}
+                onChange={(e) => updateValue('downThreshold', Number(e.target.value))}
+                min={1}
+                max={10}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="text-sm text-slate-700 md:col-span-2">
+              Recovery Threshold
+              <input
+                type="number"
+                value={values.recoveryThreshold}
+                onChange={(e) => updateValue('recoveryThreshold', Number(e.target.value))}
+                min={1}
+                max={10}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
             </label>
           </>

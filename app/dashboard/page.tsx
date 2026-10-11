@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiCard } from '@/components/dashboard/api-card';
 import { PollingControls } from '@/components/dashboard/polling-controls';
 import { EndpointForm } from '@/components/dashboard/endpoint-form';
+import { WebhooksPanel } from '@/components/dashboard/webhooks-panel';
 import type { MonitorEndpoint } from '@/types';
 
 async function fetchEndpoints(): Promise<MonitorEndpoint[]> {
@@ -77,6 +78,7 @@ export default function DashboardPage() {
 
   const apiCount = endpoints.filter((e) => e.type === 'api').length;
   const dbCount = endpoints.filter((e) => e.type === 'database').length;
+  const networkCount = endpoints.filter((e) => e.type === 'network').length;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
@@ -98,6 +100,7 @@ export default function DashboardPage() {
               Monitoring <span className="font-semibold">{endpoints.length}</span> endpoints
               {apiCount > 0 && <span className="ml-2">({apiCount} APIs)</span>}
               {dbCount > 0 && <span className="ml-2">({dbCount} Databases)</span>}
+              {networkCount > 0 && <span className="ml-2">({networkCount} Network)</span>}
             </div>
           </div>
         </header>
@@ -117,6 +120,8 @@ export default function DashboardPage() {
             />
           )}
         </div>
+
+        <WebhooksPanel />
 
         {/* Polling Controls */}
         <PollingControls 

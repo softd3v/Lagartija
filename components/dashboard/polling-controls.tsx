@@ -17,7 +17,7 @@ export function PollingControls({ onTogglePolling, isPolling }: PollingControlsP
           </h2>
           <p className="text-sm text-slate-600">
             {isPolling ? (
-              <span className="text-green-600 font-medium">● Active monitoring with email alerts</span>
+              <span className="text-green-600 font-medium">● Active monitoring with email and webhook alerts</span>
             ) : (
               <span className="text-slate-500">Manual monitoring only</span>
             )}

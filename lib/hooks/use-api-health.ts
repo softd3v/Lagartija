@@ -22,6 +22,11 @@ export function useApiHealth({
         if (!res.ok) throw new Error('Failed to check database');
         return res.json();
       }
+      if (endpoint.type === 'network') {
+        const res = await fetch(`/api/monitor/ping/${endpoint.id}`);
+        if (!res.ok) throw new Error('Failed to check network endpoint');
+        return res.json();
+      }
       // For API endpoints, use the client-side checker
       return checkApiHealth(endpoint as ApiEndpoint);
     },

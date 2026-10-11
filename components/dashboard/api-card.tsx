@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { MonitorEndpoint, ApiHealthCheck, ApiEndpoint } from '@/types';
 import { checkApiHealth } from '@/lib/api-monitor/health-checker';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database } from 'lucide-react';
+import { Clock, RefreshCw, Globe, Tag, ChevronDown, ChevronUp, Zap, Database, Network } from 'lucide-react';
 
 interface ApiCardProps {
   endpoint: MonitorEndpoint;
@@ -26,9 +27,11 @@ export function ApiCard({
   const [showResponse, setShowResponse] = useState(false);
 
   // Determine the correct API route based on endpoint type
-  const apiRoute = endpoint.type === 'database' 
+  const apiRoute = endpoint.type === 'database'
     ? `/api/monitor/database/${endpoint.id}`
-    : `/api/monitor/${endpoint.id}`;
+    : endpoint.type === 'network'
+      ? `/api/monitor/ping/${endpoint.id}`
+      : `/api/monitor/${endpoint.id}`;
 
   // Auto-polling query (server-side to trigger alerts)
   const { data: autoData } = useQuery<ApiHealthCheck>({
@@ -46,9 +49,9 @@ export function ApiCard({
   // Manual check mutation
   const healthCheckMutation = useMutation({
     mutationFn: async () => {
-      if (endpoint.type === 'database') {
+      if (endpoint.type === 'database' || endpoint.type === 'network') {
         const res = await fetch(apiRoute);
-        if (!res.ok) throw new Error('Failed to check database');
+        if (!res.ok) throw new Error(`Failed to check ${endpoint.type}`);
         return res.json();
       }
       return checkApiHealth(endpoint as ApiEndpoint);
@@ -94,9 +97,9 @@ export function ApiCard({
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-6">
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 truncate">
               {endpoint.name}
             </h3>
             {autoPolling && (
@@ -113,6 +116,11 @@ export function ApiCard({
                 <span className="font-mono text-xs truncate">
                   {endpoint.host}:{endpoint.port}/{endpoint.serviceName}
                 </span>
+              </>
+            ) : endpoint.type === 'network' ? (
+              <>
+                <Network className="w-4 h-4" />
+                <span className="font-mono text-xs truncate">{endpoint.host}</span>
               </>
             ) : (
               <>
@@ -153,7 +161,7 @@ export function ApiCard({
       {/* Method/Type and Tags */}
       <div className="flex items-center gap-2 mb-4">
         <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
-          {endpoint.type === 'database' ? 'DATABASE' : endpoint.method}
+          {endpoint.type === 'database' ? 'DATABASE' : endpoint.type === 'network' ? 'PING' : endpoint.method}
         </span>
         {endpoint.tags && endpoint.tags.length > 0 && (
           <div className="flex items-center gap-1">
@@ -253,16 +261,27 @@ export function ApiCard({
       )}
 
       {/* Action Button */}
-      <button
-        onClick={() => healthCheckMutation.mutate()}
-        disabled={healthCheckMutation.isPending || !endpoint.enabled}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#cc0000] text-white rounded-md hover:bg-[#aa0000] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-      >
-        <RefreshCw
-          className={`w-4 h-4 ${healthCheckMutation.isPending ? 'animate-spin' : ''}`}
-        />
-        {healthCheckMutation.isPending ? 'Checking...' : 'Check Now'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => healthCheckMutation.mutate()}
+          disabled={healthCheckMutation.isPending || !endpoint.enabled}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#cc0000] text-white rounded-md hover:bg-[#aa0000] disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw
+            className={`w-4 h-4 ${healthCheckMutation.isPending ? 'animate-spin' : ''}`}
+          />
+          {healthCheckMutation.isPending ? 'Checking...' : 'Check Now'}
+        </button>
+
+        {endpoint.type === 'network' && (
+          <Link
+            href={`/dashboard/ping-history/${encodeURIComponent(endpoint.name)}`}
+            className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            History
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

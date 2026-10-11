@@ -1,5 +1,5 @@
 import type { MonitorEndpoint, ApiHealthCheck, ApiStatus } from '@/types';
-import { sendAlertEmail } from './email-service';
+import { dispatchAlert } from './notification-service';
 
 interface AlertState {
   endpointId: string;
@@ -45,20 +45,21 @@ class AlertManager {
       if (currentStatus === 'down') {
         console.log(`🚨 Alert: ${endpoint.name} went DOWN`);
         try {
-          await sendAlertEmail(endpoint, healthCheck, 'down');
+          await dispatchAlert(endpoint, healthCheck, 'down');
           state.lastDownAlertTime = now;
         } catch (error) {
           console.error('Failed to send DOWN alert:', error);
         }
       }
       
-      // API RECOVERED - WITH COOLDOWN (prevent spam if flapping)
+      // API RECOVERED - cooldown unless a DOWN alert is still pending acknowledgement
       if (currentStatus === 'up' && state.lastStatus === 'down') {
+        const pendingRecovery = state.lastDownAlertTime > state.lastRecoveredAlertTime;
         const recoveredCooldownPassed = now - state.lastRecoveredAlertTime > cooldownMs;
-        if (recoveredCooldownPassed) {
+        if (pendingRecovery || recoveredCooldownPassed) {
           console.log(`✅ Alert: ${endpoint.name} recovered`);
           try {
-            await sendAlertEmail(endpoint, healthCheck, 'recovered');
+            await dispatchAlert(endpoint, healthCheck, 'recovered');
             state.lastRecoveredAlertTime = now;
           } catch (error) {
             console.error('Failed to send RECOVERY alert:', error);
@@ -80,7 +81,7 @@ class AlertManager {
         if (!healthCheck.databaseConnected) {
           console.log(`🚨 Database Alert: ${endpoint.name} database disconnected`);
           try {
-            await sendAlertEmail(endpoint, healthCheck, 'database-down');
+            await dispatchAlert(endpoint, healthCheck, 'database-down');
             state.lastDbAlertTime = now;
           } catch (error) {
             console.error('Failed to send DATABASE DOWN alert:', error);
@@ -91,7 +92,7 @@ class AlertManager {
         if (healthCheck.databaseConnected && !state.lastDatabaseConnected) {
           console.log(`✅ Database Alert: ${endpoint.name} database reconnected`);
           try {
-            await sendAlertEmail(endpoint, healthCheck, 'database-recovered');
+            await dispatchAlert(endpoint, healthCheck, 'database-recovered');
             state.lastDbAlertTime = now;
           } catch (error) {
             console.error('Failed to send DATABASE RECOVERY alert:', error);

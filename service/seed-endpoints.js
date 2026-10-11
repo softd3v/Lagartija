@@ -72,6 +72,30 @@ const fallbackEndpoints = [
     timeout: 10000,
     enabled: true,
   },
+  {
+    id: 'RTG14',
+    type: 'network',
+    name: 'RTG14',
+    host: '175.30.30.149',
+    interval: 30000,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
+  },
+  {
+    id: 'RTG40',
+    type: 'network',
+    name: 'RTG40',
+    host: '175.30.30.189',
+    interval: 30000,
+    timeout: 2000,
+    enabled: true,
+    pingPackets: 1,
+    downThreshold: 2,
+    recoveryThreshold: 2,
+  },
 ];
 
 const result = seedFromFallback(fallbackEndpoints);

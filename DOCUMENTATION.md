@@ -1,5 +1,23 @@
 # Xentinel - Technical Documentation
 
+> **⚠️ Documentación movida:** La fuente actualizada está en [`docs/`](./docs/README.md).
+> Este archivo se mantiene por compatibilidad.
+
+## 📖 Nueva documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| [docs/README.md](./docs/README.md) | Índice |
+| [docs/ARQUITECTURA.md](./docs/ARQUITECTURA.md) | Arquitectura y flujos |
+| [docs/INSTALACION.md](./docs/INSTALACION.md) | Instalación |
+| [docs/WEBHOOKS.md](./docs/WEBHOOKS.md) | Webhooks Discord/Slack |
+| [docs/EMAIL_Y_NOTIFICACIONES.md](./docs/EMAIL_Y_NOTIFICACIONES.md) | Email y alertas |
+| [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Solución de problemas |
+
+---
+
+# Xentinel - Technical Documentation (legacy)
+
 ## 📖 Table of Contents
 1. [Architecture Overview](#architecture-overview)
 2. [Data Flow](#data-flow)
